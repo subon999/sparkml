@@ -27,7 +27,7 @@ object tempDF {
 
     try {
       val df = spark.read.option("header", false)
-        .csv("/Volumes/DATA/dev/sparkml/data/1800.csv")
+        .csv("/home/subon999/Documents/development/data/ml-25m/1800.csv")
 
 
       val dfNrch=df.filter('_c2==="TMIN").

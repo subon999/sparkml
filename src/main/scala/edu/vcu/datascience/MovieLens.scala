@@ -17,30 +17,64 @@ object MovieLens {
     val spark = SparkSession.builder()
       .appName("MovieLens")
       .master("local[*]")
+      .config("spark.sql.shuffle.partitions",10)
+      .config("park.default.parallelism",10)
+      .config("spark.sql.autoBroadcastJoinThreshold", -1)
       .getOrCreate()
+
+
+
     println("___Spark conf created___")
+
+    //--conf spark.sql.shuffle.partitions=500 --conf spark.default.parallelism=500
 
     import spark.implicits._
 
     try
       {
-        val df = spark.read.option("header",true)
-          .csv("/Volumes/DATA/dev/data/ml-25m/ratings.csv")
+        val dfRateings = spark.read.option("header",true)
+          .csv("/home/subon999/Documents/development/data/ml-25m/ratings.csv").repartition(6,$"movieId").sortWithinPartitions()
 
-        println("==========count: " + df.cache.count() + " =================")
+        val dfMovies = spark.read.option("header",true)
+          .csv("/home/subon999/Documents/development/data/ml-25m/movies.csv").repartition(6,$"movieId").sortWithinPartitions()
 
-        df.show(false)
+        println("==========partitions: "+ dfRateings.rdd.getNumPartitions +" =================")
+
+        println("==========partitions: "+ dfMovies.rdd.partitions.size +" =================")
+
+        println("==========count: " + dfRateings.cache.count() + " =================")
+
+        println("==========count: " + dfMovies.cache.count() + " =================")
+  
+  
+        //spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+
+        //df.show(false)
 
         println("============================================================")
 
-        df.printSchema()
+        dfRateings.printSchema()
 
-        val dfnrch=df.groupBy($"movieId").
+        val dfTopR=dfRateings.groupBy($"movieId").
           agg(count("rating") as "Counts").
           sort($"Counts".desc)
 
-        dfnrch.show(false)
+        val dfTpRN=dfTopR
+          .as("r")
+            .join(
+              dfMovies.as("m"),
+              ($"r.movieId"===$"m.movieId"),
+              "leftouter"
+            ).select($"title"
+            ,$"Counts".alias("TimesRated")
+            ).sort($"TimesRated".desc)
 
+        dfTpRN.explain()
+
+        dfTopR.show(false)
+
+        dfTpRN.show(false)
+        
       }
 
   }
